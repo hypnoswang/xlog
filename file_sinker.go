@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// The time based rotation strategy constant
 const (
 	TimeRotateNone = iota
 	TimeRotateHourly
@@ -162,7 +163,7 @@ func (fsk *FileSinker) rotate() {
 		return
 	}
 
-	var tstr string = ""
+	var tstr string
 	if fsk.conf.RotateTime != TimeRotateNone {
 		switch fsk.conf.RotateTime {
 		case TimeRotateHourly:
@@ -173,7 +174,7 @@ func (fsk *FileSinker) rotate() {
 		}
 	}
 
-	var fseq int = fsk.fseq
+	fseq := fsk.fseq
 	if fsk.conf.RotateSize > 0 {
 		if tstr != fsk.tstr {
 			fseq = 0
