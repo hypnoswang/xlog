@@ -33,6 +33,7 @@ func NewFileLogger(conf *FileSinkerConf, level, formatter int) *FileLogger {
 	return logger
 }
 
+// Close gives an chance to do some cleaning work
 func (f *FileLogger) Close() {
 	sinker := f.Logger.Out.(*FileSinker)
 	sinker.Close()

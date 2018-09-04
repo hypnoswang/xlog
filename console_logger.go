@@ -29,6 +29,7 @@ func NewConsoleLogger(level, formatter int) *ConsoleLogger {
 	return logger
 }
 
+// Close just to implement the Logger interface
 func (c *ConsoleLogger) Close() {
 	// do nothing
 }
