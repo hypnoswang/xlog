@@ -13,7 +13,6 @@ type FileLogger struct {
 // NewFileLogger create a new FileLogger
 // TODO: add hooks support
 func NewFileLogger(conf *FileSinkerConf, level, formatter int) *FileLogger {
-
 	lvl := levelToLogrusLevel(level)
 	fmtr := createLogrusFormatter(formatter)
 
@@ -32,4 +31,9 @@ func NewFileLogger(conf *FileSinkerConf, level, formatter int) *FileLogger {
 	}
 
 	return logger
+}
+
+func (f *FileLogger) Close() {
+	sinker := f.Logger.Out.(*FileSinker)
+	sinker.Close()
 }

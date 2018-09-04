@@ -35,6 +35,7 @@ const (
 // Logger is the abstract of logrus.FieldLogger and logrus.StdLogger
 type Logger interface {
 	logrus.FieldLogger
+	Close()
 }
 
 func levelToLogrusLevel(level int) logrus.Level {

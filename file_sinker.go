@@ -91,8 +91,8 @@ func NewFileSinker(conf *FileSinkerConf) *FileSinker {
 		log.Printf("FileSinker path failer: [%s: %s]", dir, err.Error())
 		return nil
 	} else if err != nil {
-		if err1 := os.MkdirAll(dir, 0644); err1 != nil {
-			log.Println("FileSinker mkdir failed: [%s: %s]", dir, err.Error())
+		if err1 := os.MkdirAll(dir, 0755); err1 != nil {
+			log.Printf("FileSinker mkdir failed: [%s: %s]", dir, err.Error())
 			return nil
 		}
 	}
@@ -104,7 +104,7 @@ func NewFileSinker(conf *FileSinkerConf) *FileSinker {
 	fsk := &FileSinker{
 		conf:        conf,
 		outer:       nil,
-		dir:         dir,
+		dir:         dir[:len(dir)-1], // we drop the last "/" in dirpath
 		prefix:      prefix,
 		sizeWritten: -1,
 		curfp:       nil,
@@ -116,6 +116,24 @@ func NewFileSinker(conf *FileSinkerConf) *FileSinker {
 	}
 
 	return fsk
+}
+
+// Close flush the buffer and close the file
+func (fsk *FileSinker) Close() {
+	if fsk.outer != nil {
+		fsk.outer.Flush()
+		fsk.outer = nil
+	}
+
+	if fsk.curfp != nil {
+		fsk.curfp.Close()
+		fsk.curfp = nil
+	}
+
+	fsk.sizeWritten = -1
+	fsk.curfile = ""
+	fsk.fseq = -1
+	fsk.tstr = ""
 }
 
 // Write implements the logrus.Logger.Out interface
@@ -155,11 +173,11 @@ func (fsk *FileSinker) rotate() {
 	// if rotate by both time and size, the file name will be:
 	//		prefix.YYYY-MM-DD[-HH].0, prefix.YYYY-MM-DD[-HH].1, ...
 
-	if fsk.conf.RotateSize <= 0 ||
+	filename := fmt.Sprintf("%s/%s", fsk.dir, fsk.prefix)
+
+	if fsk.conf.RotateSize <= 0 &&
 		fsk.conf.RotateTime == TimeRotateNone {
-		if len(fsk.curfile) <= 0 {
-			fsk.fileRotate(-1, "")
-		}
+		fsk.fileRotate(filename)
 		return
 	}
 
@@ -172,6 +190,8 @@ func (fsk *FileSinker) rotate() {
 			tstr = time.Now().Format("2006-01-02")
 		default:
 		}
+
+		filename = fmt.Sprintf("%s.%s", filename, tstr)
 	}
 
 	fseq := fsk.fseq
@@ -182,26 +202,23 @@ func (fsk *FileSinker) rotate() {
 			fsk.sizeWritten >= fsk.conf.RotateSize {
 			fseq++
 		}
-	}
 
-	fsk.fileRotate(fseq, tstr)
-}
-
-func (fsk *FileSinker) fileRotate(fseq int, tstr string) {
-	filename := fmt.Sprintf("%s/%s", fsk.dir, fsk.prefix)
-	if tstr != fsk.tstr {
-		filename = fmt.Sprintf("%s.%s", filename, tstr)
-	}
-	if fseq != fsk.fseq {
-		fseq = fsk.findAvailableFileSeq(fseq, tstr)
+		fseq = fsk.findAvailableFileSeq(fseq, filename)
 		filename = fmt.Sprintf("%s.%d", filename, fseq)
 	}
 
+	if fsk.fileRotate(filename) {
+		fsk.fseq = fseq
+		fsk.tstr = tstr
+	}
+}
+
+func (fsk *FileSinker) fileRotate(filename string) bool {
 	if filename != fsk.curfile {
 		fp, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Printf("FileSinker open new file failed: [%s: %s]", filename, err.Error())
-			return
+			return false
 		}
 
 		if fsk.outer != nil {
@@ -212,22 +229,17 @@ func (fsk *FileSinker) fileRotate(fseq int, tstr string) {
 			fsk.curfp.Close()
 		}
 
-		fsk.fseq = fseq
-		fsk.tstr = tstr
 		fsk.sizeWritten = 0
 		fsk.curfile = filename
 		fsk.outer = bufio.NewWriter(fp)
 	}
+
+	return true
 }
 
 // Find the first available file sequence in case that the previous sequence numbers
 // have already been used
-func (fsk *FileSinker) findAvailableFileSeq(fseq int, tstr string) int {
-	filename := fmt.Sprintf("%s/%s", fsk.dir, fsk.prefix)
-	if tstr != fsk.tstr {
-		filename = fmt.Sprintf("%s.%s", filename, tstr)
-	}
-
+func (fsk *FileSinker) findAvailableFileSeq(fseq int, filename string) int {
 	if fseq != fsk.fseq {
 		for seq := fseq; seq < 1000000; seq++ {
 			file := fmt.Sprintf("%s.%d", filename, seq)
