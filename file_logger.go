@@ -34,6 +34,9 @@ func NewFileLogger(conf *FileSinkerConf, level, formatter int) *FileLogger {
 }
 
 // Close gives an chance to do some cleaning work
+// You must invoke this function carefully, because we don't have any
+// synchronous machanism to protect the sinker's outer and curfp.
+// A good way is that close this logger just before your program exit.
 func (f *FileLogger) Close() {
 	sinker := f.Logger.Out.(*FileSinker)
 	sinker.Close()
