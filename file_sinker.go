@@ -163,6 +163,10 @@ func (fsk *FileSinker) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// The rotate function is invoked only in the Write function.
+// All the Wirte operation will be protected by the logrus.Logger's lock,
+// Therefore, we need not use another lock to protect the fsk.outer and
+// fsk.curfp
 func (fsk *FileSinker) rotate() {
 	// if no rotation is configured, the log file name will be:
 	//		prefix
